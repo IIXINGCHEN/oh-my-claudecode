@@ -34,7 +34,20 @@
 
 ## Quick Install
 
-### One-liner (macOS/Linux - recommended)
+### Via Claude Code Plugin (Recommended)
+
+```bash
+# In Claude Code, run:
+/plugin install oh-my-claude-sisyphus
+
+# Or from a marketplace:
+/plugin marketplace add Yeachan-Heo/oh-my-claude-sisyphus
+/plugin install oh-my-claude-sisyphus@Yeachan-Heo/oh-my-claude-sisyphus
+```
+
+This is the cleanest installation method - integrates directly with Claude Code's plugin system.
+
+### One-liner (macOS/Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Yeachan-Heo/oh-my-claude-sisyphus/main/scripts/install.sh | bash
@@ -46,7 +59,7 @@ curl -fsSL https://raw.githubusercontent.com/Yeachan-Heo/oh-my-claude-sisyphus/m
 npm install -g oh-my-claude-sisyphus
 ```
 
-> **Windows Users**: This is the only supported installation method. Requires Node.js 18+.
+> **Windows Users**: This is the recommended installation method. Requires Node.js 18+.
 
 ### Manual Install (macOS/Linux)
 
@@ -60,6 +73,24 @@ chmod +x scripts/install.sh
 ---
 
 ## What Gets Installed
+
+### Plugin Structure (Claude Code Plugin Format)
+
+The repository is also a Claude Code plugin with this structure:
+
+```
+oh-my-claude-sisyphus/
+├── .claude-plugin/
+│   └── plugin.json            # Plugin manifest
+├── agents/                    # 11 specialized subagents
+├── commands/                  # 12 slash commands
+├── skills/                    # 3 skills (ultrawork, git-master, frontend-ui-ux)
+├── hooks/
+│   └── hooks.json             # Hook configuration
+└── scripts/                   # Hook scripts
+```
+
+### Traditional Installation Structure
 
 The installer adds to your Claude Code config (`~/.claude/`):
 
@@ -88,7 +119,12 @@ The installer adds to your Claude Code config (`~/.claude/`):
 │   ├── prometheus.md       # /prometheus command
 │   ├── orchestrator.md     # /orchestrator command
 │   ├── ralph-loop.md       # /ralph-loop command
-│   └── cancel-ralph.md     # /cancel-ralph command
+│   ├── cancel-ralph.md     # /cancel-ralph command
+│   └── update.md           # /update command
+├── skills/
+│   ├── ultrawork/SKILL.md  # Maximum performance mode
+│   ├── git-master/SKILL.md # Git expert skill
+│   └── frontend-ui-ux/SKILL.md # UI/UX design skill
 └── CLAUDE.md               # Sisyphus system prompt
 ```
 
