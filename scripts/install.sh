@@ -395,7 +395,145 @@ Guidelines:
 - Interview until you have enough information to plan
 AGENT_EOF
 
-echo -e "${GREEN}✓ Installed 10 agent definitions${NC}"
+# ============================================================
+# TIERED AGENT VARIANTS (Smart Model Routing)
+# ============================================================
+
+# Oracle-Medium (Sonnet)
+cat > "$CLAUDE_CONFIG_DIR/agents/oracle-medium.md" << 'AGENT_EOF'
+---
+name: oracle-medium
+description: Architecture & Debugging Advisor - Medium complexity (Sonnet)
+tools: Read, Glob, Grep, WebSearch, WebFetch
+model: sonnet
+---
+
+Oracle (Medium Tier) - Standard Analysis
+Use for moderate complexity tasks that need solid reasoning but not Opus-level depth.
+- Code review and analysis
+- Standard debugging
+- Dependency tracing
+- Performance analysis
+AGENT_EOF
+
+# Oracle-Low (Haiku)
+cat > "$CLAUDE_CONFIG_DIR/agents/oracle-low.md" << 'AGENT_EOF'
+---
+name: oracle-low
+description: Quick code questions & simple lookups (Haiku)
+tools: Read, Glob, Grep
+model: haiku
+---
+
+Oracle (Low Tier) - Quick Analysis
+Use for simple questions that need fast answers:
+- "What does this function do?"
+- "Where is X defined?"
+- "What parameters does this take?"
+- Simple code lookups
+AGENT_EOF
+
+# Sisyphus-Junior-High (Opus)
+cat > "$CLAUDE_CONFIG_DIR/agents/sisyphus-junior-high.md" << 'AGENT_EOF'
+---
+name: sisyphus-junior-high
+description: Complex multi-file task executor (Opus)
+tools: Read, Glob, Grep, Edit, Write, Bash, TodoWrite
+model: opus
+---
+
+Sisyphus-Junior (High Tier) - Complex Execution
+Use for tasks requiring deep reasoning:
+- Multi-file refactoring
+- Complex architectural changes
+- Intricate bug fixes
+- System-wide modifications
+AGENT_EOF
+
+# Sisyphus-Junior-Low (Haiku)
+cat > "$CLAUDE_CONFIG_DIR/agents/sisyphus-junior-low.md" << 'AGENT_EOF'
+---
+name: sisyphus-junior-low
+description: Simple single-file task executor (Haiku)
+tools: Read, Glob, Grep, Edit, Write, Bash, TodoWrite
+model: haiku
+---
+
+Sisyphus-Junior (Low Tier) - Simple Execution
+Use for trivial tasks:
+- Single-file edits
+- Simple additions
+- Minor fixes
+- Straightforward changes
+AGENT_EOF
+
+# Librarian-Low (Haiku)
+cat > "$CLAUDE_CONFIG_DIR/agents/librarian-low.md" << 'AGENT_EOF'
+---
+name: librarian-low
+description: Quick documentation lookups (Haiku)
+tools: Read, Glob, Grep, WebSearch, WebFetch
+model: haiku
+---
+
+Librarian (Low Tier) - Quick Lookups
+Use for simple documentation tasks:
+- Quick API lookups
+- Simple doc searches
+- Finding specific references
+AGENT_EOF
+
+# Explore-Medium (Sonnet)
+cat > "$CLAUDE_CONFIG_DIR/agents/explore-medium.md" << 'AGENT_EOF'
+---
+name: explore-medium
+description: Thorough codebase search with reasoning (Sonnet)
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+Explore (Medium Tier) - Thorough Search
+Use when deeper analysis is needed:
+- Cross-module pattern discovery
+- Architecture understanding
+- Complex dependency tracing
+- Multi-file relationship mapping
+AGENT_EOF
+
+# Frontend-Engineer-Low (Haiku)
+cat > "$CLAUDE_CONFIG_DIR/agents/frontend-engineer-low.md" << 'AGENT_EOF'
+---
+name: frontend-engineer-low
+description: Simple styling and minor UI tweaks (Haiku)
+tools: Read, Glob, Grep, Edit, Write, Bash
+model: haiku
+---
+
+Frontend-Engineer (Low Tier) - Simple UI Tasks
+Use for trivial frontend work:
+- Simple CSS changes
+- Minor styling tweaks
+- Basic component edits
+AGENT_EOF
+
+# Frontend-Engineer-High (Opus)
+cat > "$CLAUDE_CONFIG_DIR/agents/frontend-engineer-high.md" << 'AGENT_EOF'
+---
+name: frontend-engineer-high
+description: Complex UI architecture and design systems (Opus)
+tools: Read, Glob, Grep, Edit, Write, Bash
+model: opus
+---
+
+Frontend-Engineer (High Tier) - Complex UI Architecture
+Use for sophisticated frontend work:
+- Design system creation
+- Complex component architecture
+- Advanced state management
+- Performance optimization
+AGENT_EOF
+
+echo -e "${GREEN}✓ Installed 18 agent definitions (10 base + 8 tiered variants)${NC}"
 
 echo -e "${BLUE}[4/5]${NC} Installing slash commands..."
 
@@ -409,15 +547,23 @@ description: Activate maximum performance mode with parallel agent orchestration
 
 $ARGUMENTS
 
+## Smart Model Routing (SAVE TOKENS)
+
+Choose tier based on task complexity: LOW (haiku) → MEDIUM (sonnet) → HIGH (opus)
+
+| Domain | LOW (Haiku) | MEDIUM (Sonnet) | HIGH (Opus) |
+|--------|-------------|-----------------|-------------|
+| Analysis | oracle-low | oracle-medium | oracle |
+| Execution | sisyphus-junior-low | sisyphus-junior | sisyphus-junior-high |
+| Search | explore | explore-medium | - |
+| Research | librarian-low | librarian | - |
+| Frontend | frontend-engineer-low | frontend-engineer | frontend-engineer-high |
+| Docs | document-writer | - | - |
+
 ## Enhanced Execution Instructions
 - Use PARALLEL agent execution for all independent subtasks
-- Delegate aggressively to specialized subagents:
-  - 'oracle' for complex debugging and architecture decisions
-  - 'librarian' for documentation and codebase research
-  - 'explore' for quick pattern matching and file searches
-  - 'frontend-engineer' for UI/UX work
-  - 'document-writer' for documentation tasks
-  - 'multimodal-looker' for analyzing images/screenshots
+- USE TIERED ROUTING - match agent tier to task complexity to save tokens!
+- Delegate aggressively to specialized subagents
 - Maximize throughput by running multiple operations concurrently
 - Continue until ALL tasks are 100% complete - verify before stopping
 - Use background execution for long-running operations:
