@@ -466,3 +466,29 @@ export {
   type UltraQAOptions,
   type UltraQAResult
 } from './ultraqa-loop/index.js';
+
+export {
+  // Notepad (Compaction-Resilient Memory)
+  initNotepad,
+  readNotepad,
+  getPriorityContext,
+  getWorkingMemory,
+  getManualSection,
+  setPriorityContext,
+  addWorkingMemoryEntry,
+  addManualEntry,
+  pruneOldEntries,
+  getNotepadStats,
+  formatNotepadContext,
+  formatFullNotepad,
+  getNotepadPath,
+  DEFAULT_CONFIG as NOTEPAD_DEFAULT_CONFIG,
+  NOTEPAD_FILENAME,
+  PRIORITY_HEADER,
+  WORKING_MEMORY_HEADER,
+  MANUAL_HEADER,
+  type NotepadConfig,
+  type NotepadStats,
+  type PriorityContextResult,
+  type PruneResult
+} from './notepad/index.js';

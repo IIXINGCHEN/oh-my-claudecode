@@ -9,6 +9,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { pruneOldEntries } from '../dist/hooks/notepad/index.js';
 
 // Read all stdin
 async function readStdin() {
@@ -175,6 +176,16 @@ async function main() {
 
       // If PRD exists and all stories are complete, allow completion
       if (prdStatus.hasPrd && prdStatus.allComplete) {
+        // Prune old notepad entries on clean session stop
+        try {
+          const pruneResult = pruneOldEntries(directory, 7);
+          if (pruneResult.pruned > 0) {
+            // Optionally log: console.error(`Pruned ${pruneResult.pruned} old notepad entries`);
+          }
+        } catch (err) {
+          // Silently ignore prune errors
+        }
+
         console.log(JSON.stringify({
           continue: true,
           reason: `[RALPH LOOP COMPLETE - PRD] All ${prdStatus.total} stories are complete! Great work!`
@@ -301,6 +312,16 @@ ${ralphState.prompt ? `Original task: ${ralphState.prompt}` : ''}
 
       // Escape mechanism: after max reinforcements, allow stopping
       if (newCount > maxReinforcements) {
+        // Prune old notepad entries on clean session stop
+        try {
+          const pruneResult = pruneOldEntries(directory, 7);
+          if (pruneResult.pruned > 0) {
+            // Optionally log: console.error(`Pruned ${pruneResult.pruned} old notepad entries`);
+          }
+        } catch (err) {
+          // Silently ignore prune errors
+        }
+
         console.log(JSON.stringify({
           continue: true,
           reason: `[ULTRAWORK ESCAPE] Maximum reinforcements (${maxReinforcements}) reached. Allowing stop despite ${incompleteCount} incomplete todos. If tasks are genuinely stuck, consider cancelling them or asking the user for help.`
@@ -353,6 +374,16 @@ ${ultraworkState.original_prompt ? `Original task: ${ultraworkState.original_pro
 
       // Escape mechanism: after max continuations, allow stopping
       if (contState.count > maxContinuations) {
+        // Prune old notepad entries on clean session stop
+        try {
+          const pruneResult = pruneOldEntries(directory, 7);
+          if (pruneResult.pruned > 0) {
+            // Optionally log: console.error(`Pruned ${pruneResult.pruned} old notepad entries`);
+          }
+        } catch (err) {
+          // Silently ignore prune errors
+        }
+
         console.log(JSON.stringify({
           continue: true,
           reason: `[TODO ESCAPE] Maximum continuation attempts (${maxContinuations}) reached. Allowing stop despite ${incompleteCount} incomplete todos. Tasks may be stuck - consider reviewing and clearing them.`
@@ -380,7 +411,17 @@ Incomplete tasks remain in your todo list (${incompleteCount} remaining). Contin
       return;
     }
 
-    // No blocking needed
+    // No blocking needed - clean session stop
+    // Prune old notepad entries on clean session stop
+    try {
+      const pruneResult = pruneOldEntries(directory, 7);
+      if (pruneResult.pruned > 0) {
+        // Optionally log: console.error(`Pruned ${pruneResult.pruned} old notepad entries`);
+      }
+    } catch (err) {
+      // Silently ignore prune errors
+    }
+
     console.log(JSON.stringify({ continue: true }));
   } catch (error) {
     console.log(JSON.stringify({ continue: true }));

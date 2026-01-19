@@ -26,12 +26,20 @@ Implements structured task tracking inspired by the original [Ralph](https://git
   - Per-story progress entries with implementation notes, files changed, learnings
   - Pattern extraction and learning retrieval for context injection
 
+- **Notepad Memory System** (`src/hooks/notepad/index.ts`)
+  - `.sisyphus/notepad.md` for compaction-resilient context
+  - Three-tier storage: Priority Context (always loaded), Working Memory (auto-pruned), MANUAL (permanent)
+  - Auto-injection of Priority Context on session start
+  - Auto-pruning of Working Memory entries older than 7 days
+  - `/note` command for easy note-taking during sessions
+
 - **New Commands**
   - `/ralph-init <task>` - Scaffold a PRD from task description with auto-generated user stories
   - `/ultrawork-ralph <task>` - Maximum intensity mode with completion guarantee (ultrawork + ralph loop)
   - `/ultraqa <goal>` - Autonomous QA cycling workflow (test → verify → fix → repeat)
   - `/sisyphus-default` - Configure Sisyphus in local project `.claude/CLAUDE.md`
   - `/sisyphus-default-global` - Configure Sisyphus globally in `~/.claude/CLAUDE.md`
+  - `/note <content>` - Save notes to notepad.md for compaction resilience
 
 - **New Agent Tiers**
   - `qa-tester-high` (Opus) - Complex integration testing
@@ -39,7 +47,9 @@ Implements structured task tracking inspired by the original [Ralph](https://git
 - **Comprehensive Test Suites**
   - `src/__tests__/ralph-prd.test.ts` - 29 tests for PRD operations
   - `src/__tests__/ralph-progress.test.ts` - 30 tests for progress tracking
-  - Total: 300 tests (up from 231)
+  - `src/__tests__/notepad.test.ts` - 40 tests for notepad operations
+  - `src/__tests__/hooks.test.ts` - 18 new tests for design flaw fixes
+  - Total: 358 tests (up from 231)
 
 ### Changed
 
@@ -59,6 +69,12 @@ Implements structured task tracking inspired by the original [Ralph](https://git
 - **Stale position bug in `addPattern`** - Placeholder removal now happens before calculating separator position
 - **Type safety in `createPrd`** - New `UserStoryInput` type with optional priority field
 - **Recursion guard in `addPattern`** - Prevents infinite loops on repeated initialization failures
+- **Todo-continuation infinite loop** - Added max-attempts counter (5) to prevent agent getting stuck
+- **UltraQA/Ralph-Loop conflict** - Added mutual exclusion to prevent both loops running simultaneously
+- **Agent name prefixing** - Standardized all Task() calls to use `oh-my-claude-sisyphus:` prefix
+- **VERSION constant mismatch** - Fixed installer VERSION from 2.4.1 to 2.6.0
+- **Completion promise inconsistency** - Standardized to `TASK_COMPLETE`
+- **Non-existent /start-work command** - Removed references to command that doesn't exist
 
 ### Technical Details
 
