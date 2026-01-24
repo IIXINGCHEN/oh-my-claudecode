@@ -70,7 +70,7 @@ Include these words anywhere in your message:
 
 ---
 
-## Data Analysis & Research (v3.3.8)
+## Data Analysis & Research (v3.4.0)
 
 ### Scientist Agent Tiers
 
