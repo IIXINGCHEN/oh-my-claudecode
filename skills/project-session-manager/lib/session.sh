@@ -57,7 +57,7 @@ psm_add_session() {
 # Usage: psm_get_session <id>
 psm_get_session() {
     local id="$1"
-    jq -r ".sessions[\"$id\"] // empty" "$PSM_SESSIONS"
+    jq -r --arg i "$id" '.sessions[$i] // empty' "$PSM_SESSIONS"
 }
 
 # Update session state
@@ -92,7 +92,7 @@ psm_list_sessions() {
     local project="$1"
 
     if [[ -n "$project" ]]; then
-        jq -r ".sessions | to_entries[] | select(.value.project == \"$project\") | .value | \"\(.id)|\(.type)|\(.state)|\(.worktree)\"" "$PSM_SESSIONS"
+        jq -r --arg p "$project" '.sessions | to_entries[] | select(.value.project == $p) | .value | "\(.id)|\(.type)|\(.state)|\(.worktree)"' "$PSM_SESSIONS"
     else
         jq -r '.sessions | to_entries[] | .value | "\(.id)|\(.type)|\(.state)|\(.worktree)"' "$PSM_SESSIONS"
     fi
@@ -101,7 +101,7 @@ psm_list_sessions() {
 # Get sessions by state
 psm_get_sessions_by_state() {
     local state="$1"
-    jq -r ".sessions | to_entries[] | select(.value.state == \"$state\") | .value.id" "$PSM_SESSIONS"
+    jq -r --arg s "$state" '.sessions | to_entries[] | select(.value.state == $s) | .value.id' "$PSM_SESSIONS"
 }
 
 # Get session count

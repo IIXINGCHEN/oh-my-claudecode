@@ -48,11 +48,12 @@ psm_get_project() {
         return 1
     fi
 
-    local repo=$(jq -r ".aliases[\"$alias\"].repo // empty" "$PSM_PROJECTS")
-    local local_path=$(jq -r ".aliases[\"$alias\"].local // empty" "$PSM_PROJECTS")
-    local default_base=$(jq -r ".aliases[\"$alias\"].default_base // \"main\"" "$PSM_PROJECTS")
+    local repo=$(jq -r --arg a "$alias" '.aliases[$a].repo // empty' "$PSM_PROJECTS")
+    local local_path=$(jq -r --arg a "$alias" '.aliases[$a].local // empty' "$PSM_PROJECTS")
+    local default_base=$(jq -r --arg a "$alias" '.aliases[$a].default_base // "main"' "$PSM_PROJECTS")
 
-    if [[ -z "$repo" ]]; then
+    local clone_url=$(jq -r --arg a "$alias" '.aliases[$a].clone_url // empty' "$PSM_PROJECTS")
+    if [[ -z "$repo" && -z "$clone_url" ]]; then
         return 1
     fi
 
@@ -72,7 +73,7 @@ psm_get_project_provider() {
         return
     fi
     local provider
-    provider=$(jq -r ".aliases[\"$alias\"].provider // \"github\"" "$PSM_PROJECTS")
+    provider=$(jq -r --arg a "$alias" '.aliases[$a].provider // "github"' "$PSM_PROJECTS")
     echo "$provider"
 }
 
@@ -84,7 +85,7 @@ psm_get_project_jira_project() {
     if [[ ! -f "$PSM_PROJECTS" ]]; then
         return
     fi
-    jq -r ".aliases[\"$alias\"].jira_project // empty" "$PSM_PROJECTS"
+    jq -r --arg a "$alias" '.aliases[$a].jira_project // empty' "$PSM_PROJECTS"
 }
 
 # Get explicit clone_url for alias (for non-GitHub repos)
@@ -95,7 +96,7 @@ psm_get_project_clone_url() {
     if [[ ! -f "$PSM_PROJECTS" ]]; then
         return
     fi
-    jq -r ".aliases[\"$alias\"].clone_url // empty" "$PSM_PROJECTS"
+    jq -r --arg a "$alias" '.aliases[$a].clone_url // empty' "$PSM_PROJECTS"
 }
 
 # Get repo field for alias
@@ -106,7 +107,7 @@ psm_get_project_repo() {
     if [[ ! -f "$PSM_PROJECTS" ]]; then
         return
     fi
-    jq -r ".aliases[\"$alias\"].repo // empty" "$PSM_PROJECTS"
+    jq -r --arg a "$alias" '.aliases[$a].repo // empty' "$PSM_PROJECTS"
 }
 
 # Add or update project alias
@@ -117,7 +118,8 @@ psm_set_project() {
     local default_base="${4:-main}"
 
     local tmp=$(mktemp)
-    jq ".aliases[\"$alias\"] = {\"repo\": \"$repo\", \"local\": \"$local_path\", \"default_base\": \"$default_base\"}" \
+    jq --arg a "$alias" --arg r "$repo" --arg l "$local_path" --arg b "$default_base" \
+        '.aliases[$a] = {"repo": $r, "local": $l, "default_base": $b}' \
         "$PSM_PROJECTS" > "$tmp" && mv "$tmp" "$PSM_PROJECTS"
 }
 

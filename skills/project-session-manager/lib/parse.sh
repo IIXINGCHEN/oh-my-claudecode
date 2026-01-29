@@ -9,7 +9,7 @@
 #   #123              -> number=123 (use current repo)
 #
 # Usage: psm_parse_ref "omc#123"
-# Returns: type|alias|repo|number|local_path|base
+# Returns: type|alias|repo|number|local_path|base|provider|provider_ref
 psm_parse_ref() {
     local ref="$1"
     local type=""
@@ -29,7 +29,7 @@ psm_parse_ref() {
         if [[ -n "$alias" ]]; then
             IFS='|' read -r _ local_path base <<< "$(psm_get_project "$alias")"
         fi
-        echo "pr|${alias:-}|$repo|$number|${local_path:-}|$base"
+        echo "pr|${alias:-}|$repo|$number|${local_path:-}|$base|github|${repo}#${number}"
         return 0
     fi
 
@@ -42,7 +42,7 @@ psm_parse_ref() {
         if [[ -n "$alias" ]]; then
             IFS='|' read -r _ local_path base <<< "$(psm_get_project "$alias")"
         fi
-        echo "issue|${alias:-}|$repo|$number|${local_path:-}|$base"
+        echo "issue|${alias:-}|$repo|$number|${local_path:-}|$base|github|${repo}#${number}"
         return 0
     fi
 
@@ -96,7 +96,7 @@ psm_parse_ref() {
         if [[ -n "$alias" ]]; then
             IFS='|' read -r _ local_path base <<< "$(psm_get_project "$alias")"
         fi
-        echo "ref|${alias:-}|$repo|$number|${local_path:-}|$base"
+        echo "ref|${alias:-}|$repo|$number|${local_path:-}|$base|github|${repo}#${number}"
         return 0
     fi
 
@@ -112,11 +112,11 @@ psm_parse_ref() {
                 alias=$(psm_find_alias_for_repo "$repo")
             fi
         fi
-        echo "ref|${alias:-}|${repo:-}|$number|${local_path:-}|$base"
+        echo "ref|${alias:-}|${repo:-}|$number|${local_path:-}|$base|github|${repo:+${repo}#${number}}"
         return 0
     fi
 
-    echo "error|Cannot parse reference: $ref|||"
+    echo "error|Cannot parse reference: $ref||||||"
     return 1
 }
 
@@ -127,7 +127,7 @@ psm_find_alias_for_repo() {
         return 1
     fi
 
-    jq -r ".aliases | to_entries[] | select(.value.repo == \"$target_repo\") | .key" "$PSM_PROJECTS" | head -1
+    jq -r --arg r "$target_repo" '.aliases | to_entries[] | select(.value.repo == $r) | .key' "$PSM_PROJECTS" | head -1
 }
 
 # Sanitize a string for use in filenames/session names
@@ -164,7 +164,7 @@ psm_detect_jira_key() {
     fi
 
     local matching_alias
-    matching_alias=$(jq -r ".aliases | to_entries[] | select(.value.jira_project == \"$project_prefix\") | .key" "$PSM_PROJECTS" | head -1)
+    matching_alias=$(jq -r --arg p "$project_prefix" '.aliases | to_entries[] | select(.value.jira_project == $p) | .key' "$PSM_PROJECTS" | head -1)
 
     if [[ -n "$matching_alias" ]]; then
         echo "${matching_alias}|${project_prefix}|${issue_number}"
