@@ -13,7 +13,7 @@
  * ```
  */
 
-import { detectKeywordsWithType, removeCodeBlocks } from './keyword-detector/index.js';
+import { detectKeywordsWithType, removeCodeBlocks, getPrimaryKeyword, getAllKeywords } from './keyword-detector/index.js';
 import { readRalphState, incrementRalphIteration, clearRalphState, detectCompletionPromise, createRalphLoopHook } from './ralph/index.js';
 import { processOrchestratorPreTool } from './omc-orchestrator/index.js';
 import { addBackgroundTask, completeBackgroundTask } from '../hud/background-tasks.js';
@@ -148,8 +148,8 @@ function getPromptText(input: HookInput): string {
 
 /**
  * Process keyword detection hook
- * Detects ultrawork/ultrathink/search/analyze keywords and returns injection message
- * Also activates persistent ultrawork state when ultrawork keyword is detected
+ * Detects magic keywords and returns injection message
+ * Also activates persistent state for modes that require it (ralph, ultrawork)
  */
 function processKeywordDetector(input: HookInput): HookOutput {
   const promptText = getPromptText(input);
@@ -160,67 +160,75 @@ function processKeywordDetector(input: HookInput): HookOutput {
   // Remove code blocks to prevent false positives
   const cleanedText = removeCodeBlocks(promptText);
 
-  // Detect keywords
-  const keywords = detectKeywordsWithType(cleanedText);
+  // Get all keywords (supports multiple keywords in one prompt)
+  const keywords = getAllKeywords(cleanedText);
 
   if (keywords.length === 0) {
     return { continue: true };
   }
 
-  // Priority: ralph > ultrawork > ultrathink > deepsearch > analyze
-  const hasRalph = keywords.some(k => k.type === 'ralph');
-  const hasUltrawork = keywords.some(k => k.type === 'ultrawork');
-  const hasUltrathink = keywords.some(k => k.type === 'ultrathink');
-  const hasDeepsearch = keywords.some(k => k.type === 'deepsearch');
-  const hasAnalyze = keywords.some(k => k.type === 'analyze');
+  const sessionId = input.sessionId;
+  const directory = input.directory || process.cwd();
+  const messages: string[] = [];
 
-  if (hasRalph) {
-    // Activate ralph state which also auto-activates ultrawork
-    const sessionId = input.sessionId;
-    const directory = input.directory || process.cwd();
-    const hook = createRalphLoopHook(directory);
-    hook.startLoop(sessionId || 'cli-session', promptText);
+  // Process each keyword and collect messages
+  for (const keywordType of keywords) {
+    switch (keywordType) {
+      case 'ralph':
+        // Activate ralph state which also auto-activates ultrawork
+        const hook = createRalphLoopHook(directory);
+        hook.startLoop(sessionId || 'cli-session', promptText);
+        messages.push(RALPH_MESSAGE);
+        break;
 
-    return {
-      continue: true,
-      message: RALPH_MESSAGE
-    };
+      case 'ultrawork':
+        // Activate persistent ultrawork state
+        activateUltrawork(promptText, sessionId, directory);
+        messages.push(ULTRAWORK_MESSAGE);
+        break;
+
+      case 'ultrathink':
+        messages.push(ULTRATHINK_MESSAGE);
+        break;
+
+      case 'deepsearch':
+        messages.push(SEARCH_MESSAGE);
+        break;
+
+      case 'analyze':
+        messages.push(ANALYZE_MESSAGE);
+        break;
+
+      // For modes without dedicated message constants, return generic activation message
+      // These are handled by UserPromptSubmit hook for skill invocation
+      case 'cancel':
+      case 'autopilot':
+      case 'ultrapilot':
+      case 'ecomode':
+      case 'swarm':
+      case 'pipeline':
+      case 'ralplan':
+      case 'plan':
+      case 'tdd':
+      case 'research':
+        messages.push(`[MODE: ${keywordType.toUpperCase()}] Skill invocation handled by UserPromptSubmit hook.`);
+        break;
+
+      default:
+        // Skip unknown keywords
+        break;
+    }
   }
 
-  if (hasUltrawork) {
-    // Activate persistent ultrawork state
-    const sessionId = input.sessionId;
-    const directory = input.directory || process.cwd();
-    activateUltrawork(promptText, sessionId, directory);
-
-    return {
-      continue: true,
-      message: ULTRAWORK_MESSAGE
-    };
+  // Return combined message with delimiter
+  if (messages.length === 0) {
+    return { continue: true };
   }
 
-  if (hasUltrathink) {
-    return {
-      continue: true,
-      message: ULTRATHINK_MESSAGE
-    };
-  }
-
-  if (hasDeepsearch) {
-    return {
-      continue: true,
-      message: SEARCH_MESSAGE
-    };
-  }
-
-  if (hasAnalyze) {
-    return {
-      continue: true,
-      message: ANALYZE_MESSAGE
-    };
-  }
-
-  return { continue: true };
+  return {
+    continue: true,
+    message: messages.join('\n\n---\n\n')
+  };
 }
 
 /**
