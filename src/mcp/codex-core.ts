@@ -11,8 +11,8 @@
 import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'fs';
 import { dirname, resolve, relative, sep, isAbsolute, basename, join } from 'path';
-import { getWorktreeRoot } from '../lib/worktree-paths.js';
 import { detectCodexCli } from './cli-detection.js';
+import { getWorktreeRoot } from '../lib/worktree-paths.js';
 import { resolveSystemPrompt, buildPromptWithSystemContext } from './prompt-injection.js';
 import { persistPrompt, persistResponse, getExpectedResponsePath } from './prompt-persistence.js';
 import { writeJobStatus, getStatusFilePath, readJobStatus } from './prompt-persistence.js';
@@ -139,7 +139,10 @@ export function executeCodex(prompt: string, model: string, cwd?: string): Promi
     const args = ['exec', '-m', model, '--json', '--full-auto'];
     const child = spawn('codex', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      ...(cwd ? { cwd } : {})
+      ...(cwd ? { cwd } : {}),
+      // shell: true needed on Windows for .cmd/.bat executables.
+      // Safe: args are array-based and model names are regex-validated.
+      ...(process.platform === 'win32' ? { shell: true } : {})
     });
 
     // Manual timeout handling to ensure proper cleanup
@@ -272,9 +275,12 @@ export function executeCodexBackground(
       validateModelName(tryModel);
       const args = ['exec', '-m', tryModel, '--json', '--full-auto'];
       const child = spawn('codex', args, {
-        detached: true,
+        detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],
-        ...(workingDirectory ? { cwd: workingDirectory } : {})
+        ...(workingDirectory ? { cwd: workingDirectory } : {}),
+        // shell: true needed on Windows for .cmd/.bat executables.
+        // Safe: args are array-based and model names are regex-validated.
+        ...(process.platform === 'win32' ? { shell: true } : {})
       });
 
       if (!child.pid) {
@@ -402,6 +408,8 @@ export function executeCodexBackground(
             model: tryModel,
             status: 'completed',
             completedAt: new Date().toISOString(),
+            usedFallback: usedFallback || undefined,
+            fallbackModel: usedFallback ? tryModel : undefined,
           }, workingDirectory);
         } else {
           writeJobStatus({
@@ -450,14 +458,14 @@ export function validateAndReadFile(filePath: string, baseDir?: string): string 
     const cwdReal = realpathSync(workingDir);
 
     const relAbs = relative(cwdReal, resolvedAbs);
-    if (relAbs === '' || relAbs === '..' || relAbs.startsWith('..' + sep)) {
+    if (relAbs === '..' || relAbs.startsWith('..' + sep) || isAbsolute(relAbs)) {
       return `[BLOCKED] File '${filePath}' is outside the working directory. Only files within the project are allowed.`;
     }
 
     // Symlink-safe check: ensure the real path also stays inside the boundary.
     const resolvedReal = realpathSync(resolvedAbs);
     const relReal = relative(cwdReal, resolvedReal);
-    if (relReal === '' || relReal === '..' || relReal.startsWith('..' + sep)) {
+    if (relReal === '..' || relReal.startsWith('..' + sep) || isAbsolute(relReal)) {
       return `[BLOCKED] File '${filePath}' is outside the working directory. Only files within the project are allowed.`;
     }
 
@@ -491,15 +499,6 @@ export async function handleAskCodex(args: {
 }): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
   const { agent_role, model = CODEX_DEFAULT_MODEL, context_files } = args;
 
-  // Derive trusted root from process.cwd(), NOT from user-controlled input
-  const trustedRoot = getWorktreeRoot(process.cwd()) || process.cwd();
-  let trustedRootReal: string;
-  try {
-    trustedRootReal = realpathSync(trustedRoot);
-  } catch {
-    trustedRootReal = trustedRoot; // Fallback if realpath fails
-  }
-
   // Derive baseDir from working_directory if provided
   let baseDir = args.working_directory || process.cwd();
   let baseDirReal: string;
@@ -512,14 +511,29 @@ export async function handleAskCodex(args: {
     };
   }
 
-  // Validate baseDir is within trusted root
-  const relToRoot = relative(trustedRootReal, baseDirReal);
-  if (relToRoot.startsWith('..') || isAbsolute(relToRoot)) {
-    return {
-      content: [{ type: 'text' as const, text: `working_directory '${args.working_directory}' is outside the trusted worktree root '${trustedRoot}'.` }],
-      isError: true
-    };
+  // Security: validate working_directory is within worktree (unless bypass enabled)
+  if (process.env.OMC_ALLOW_EXTERNAL_WORKDIR !== '1') {
+    const worktreeRoot = getWorktreeRoot(baseDirReal);
+    if (worktreeRoot) {
+      let worktreeReal: string;
+      try {
+        worktreeReal = realpathSync(worktreeRoot);
+      } catch {
+        // If worktree root can't be resolved, skip boundary check rather than break
+        worktreeReal = '';
+      }
+      if (worktreeReal) {
+        const relToWorktree = relative(worktreeReal, baseDirReal);
+        if (relToWorktree.startsWith('..') || isAbsolute(relToWorktree)) {
+          return {
+            content: [{ type: 'text' as const, text: `working_directory '${args.working_directory}' is outside the project worktree (${worktreeRoot}). Set OMC_ALLOW_EXTERNAL_WORKDIR=1 to bypass.` }],
+            isError: true
+          };
+        }
+      }
+    }
   }
+
 
   // Validate agent_role
   if (!agent_role || !(CODEX_VALID_ROLES as readonly string[]).includes(agent_role)) {
@@ -561,7 +575,7 @@ export async function handleAskCodex(args: {
   const resolvedPath = resolve(baseDir, args.prompt_file);
   const cwdReal = realpathSync(baseDir);
   const relPath = relative(cwdReal, resolvedPath);
-  if (relPath === '' || relPath === '..' || relPath.startsWith('..' + sep)) {
+  if (relPath === '..' || relPath.startsWith('..' + sep) || isAbsolute(relPath)) {
     return {
       content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' is outside the working directory.` }],
       isError: true
@@ -578,7 +592,7 @@ export async function handleAskCodex(args: {
     };
   }
   const relReal = relative(cwdReal, resolvedReal);
-  if (relReal === '' || relReal === '..' || relReal.startsWith('..' + sep)) {
+  if (relReal === '..' || relReal.startsWith('..' + sep) || isAbsolute(relReal)) {
     return {
       content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' resolves to a path outside the working directory.` }],
       isError: true
@@ -764,17 +778,17 @@ ${resolvedPrompt}`;
       } else {
         // CLI didn't write the file, write parsed response ourselves
         const outputPath = resolvedOutputPath;
-        const relOutput = relative(trustedRootReal, outputPath);
-        if (relOutput === '' || relOutput.startsWith('..') || isAbsolute(relOutput)) {
-          console.warn(`[codex-core] output_file '${args.output_file}' resolves outside trusted root, skipping write.`);
+        const relOutput = relative(baseDirReal, outputPath);
+        if (relOutput.startsWith('..') || isAbsolute(relOutput)) {
+          console.warn(`[codex-core] output_file '${args.output_file}' resolves outside working directory, skipping write.`);
         } else {
           try {
             const outputDir = dirname(outputPath);
 
             if (!existsSync(outputDir)) {
-              const relDir = relative(trustedRootReal, outputDir);
+              const relDir = relative(baseDirReal, outputDir);
               if (relDir.startsWith('..') || isAbsolute(relDir)) {
-                console.warn(`[codex-core] output_file directory is outside trusted root, skipping write.`);
+                console.warn(`[codex-core] output_file directory is outside working directory, skipping write.`);
               } else {
                 mkdirSync(outputDir, { recursive: true });
               }
@@ -788,9 +802,9 @@ ${resolvedPrompt}`;
             }
 
             if (outputDirReal) {
-              const relDirReal = relative(trustedRootReal, outputDirReal);
+              const relDirReal = relative(baseDirReal, outputDirReal);
               if (relDirReal.startsWith('..') || isAbsolute(relDirReal)) {
-                console.warn(`[codex-core] output_file directory resolves outside trusted root, skipping write.`);
+                console.warn(`[codex-core] output_file directory resolves outside working directory, skipping write.`);
               } else {
                 const safePath = join(outputDirReal, basename(outputPath));
                 writeFileSync(safePath, response, 'utf-8');
