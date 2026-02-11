@@ -347,14 +347,22 @@ async function main(): Promise<void> {
     // When tail parsing kicks in for large transcripts, sessionStart comes from
     // the first entry in the tail chunk rather than the actual session start.
     // We persist the real start time in HUD state on first observation.
+    // Scoped per session ID so a new session in the same cwd resets the timestamp.
     let sessionStart = transcriptData.sessionStart;
-    if (hudState?.sessionStartTimestamp) {
-      // Use persisted value (the real session start)
-      sessionStart = new Date(hudState.sessionStartTimestamp);
+    const currentSessionId = extractSessionId(stdin.transcript_path);
+    const sameSession = hudState?.sessionId === currentSessionId;
+    if (sameSession && hudState?.sessionStartTimestamp) {
+      // Use persisted value (the real session start) - but validate first
+      const persisted = new Date(hudState.sessionStartTimestamp);
+      if (!isNaN(persisted.getTime())) {
+        sessionStart = persisted;
+      }
+      // If invalid, fall through to transcript-derived sessionStart
     } else if (sessionStart) {
-      // First time seeing session start - persist it
+      // First time seeing session start (or new session) - persist it
       const stateToWrite = hudState || { timestamp: new Date().toISOString(), backgroundTasks: [] };
       stateToWrite.sessionStartTimestamp = sessionStart.toISOString();
+      stateToWrite.sessionId = currentSessionId;
       stateToWrite.timestamp = new Date().toISOString();
       writeHudState(stateToWrite, cwd);
     }
