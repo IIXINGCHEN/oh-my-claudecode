@@ -615,7 +615,7 @@ You have an active autopilot session from ${autopilotState.started_at}.
 Original idea: ${autopilotState.originalIdea}
 Current phase: ${autopilotState.phase}
 
-Continue autopilot execution until complete.
+Treat this as prior-session context only. Prioritize the user's newest request, and resume autopilot only if the user explicitly asks to continue it.
 
 </session-restore>
 
@@ -633,7 +633,7 @@ Continue autopilot execution until complete.
 You have an active ultrawork session from ${ultraworkState.started_at}.
 Original task: ${ultraworkState.original_prompt}
 
-Continue working in ultrawork mode until all tasks are complete.
+Treat this as prior-session context only. Prioritize the user's newest request, and resume ultrawork only if the user explicitly asks to continue it.
 
 </session-restore>
 
@@ -668,7 +668,7 @@ You have an active Team staged run for "${teamName}".
 Current stage: ${stage}
 ${getTeamStagePrompt(stage)}
 
-Resume from this stage and continue the staged Team workflow.
+Treat this as prior-session context only. Prioritize the user's newest request, and resume the staged Team workflow only if the user explicitly asks to continue it.
 
 </session-restore>
 
