@@ -361,17 +361,31 @@ const SKILL_PROTECTION_CONFIGS = {
 };
 
 const SKILL_PROTECTION_MAP = {
+  // === Already have mode state → no additional protection ===
   autopilot: 'none', ralph: 'none', ultrawork: 'none', team: 'none',
   'omc-teams': 'none', ultraqa: 'none', cancel: 'none',
+
+  // === Instant / read-only → no protection needed ===
   trace: 'none', hud: 'none', 'omc-doctor': 'none', 'omc-help': 'none',
   'learn-about-omc': 'none', note: 'none',
-  tdd: 'light', 'build-fix': 'light', analyze: 'light', skill: 'light',
-  'configure-notifications': 'light',
-  'code-review': 'medium', 'security-review': 'medium', plan: 'medium',
-  ralplan: 'medium', review: 'medium', 'external-context': 'medium',
+
+  // === Light protection (simple shortcuts, 3 reinforcements) ===
+  skill: 'light', ask: 'light', 'configure-notifications': 'light',
+
+  // === Medium protection (review/planning, 5 reinforcements) ===
+  'omc-plan': 'medium', plan: 'medium',
+  ralplan: 'none',  // Has first-class checkRalplan() enforcement; no skill-active needed
+  'deep-interview': 'heavy',
+  review: 'medium', 'external-context': 'medium',
+  'ai-slop-cleaner': 'medium',
   sciomc: 'medium', learner: 'medium', 'omc-setup': 'medium',
+  setup: 'medium',        // alias for omc-setup
   'mcp-setup': 'medium', 'project-session-manager': 'medium',
-  'writer-memory': 'medium', 'ralph-init': 'medium', ccg: 'medium',
+  psm: 'medium',          // alias for project-session-manager
+  'writer-memory': 'medium', 'ralph-init': 'medium',
+  release: 'medium', ccg: 'medium',
+
+  // === Heavy protection (long-running, 10 reinforcements) ===
   deepinit: 'heavy',
 };
 
@@ -426,17 +440,6 @@ function writeSkillActiveState(directory, skillName, sessionId, rawSkillName) {
   const now = new Date().toISOString();
   const normalized = (skillName || '').toLowerCase().replace(/^oh-my-claudecode:/, '');
 
-  const state = {
-    active: true,
-    skill_name: normalized,
-    session_id: sessionId || undefined,
-    started_at: now,
-    last_checked_at: now,
-    reinforcement_count: 0,
-    max_reinforcements: config.maxReinforcements,
-    stale_ttl_ms: config.staleTtlMs,
-  };
-
   const stateDir = join(directory, '.omc', 'state');
   const safeSessionId = sessionId && SESSION_ID_PATTERN.test(sessionId) ? sessionId : '';
   const targetDir = safeSessionId
@@ -444,12 +447,47 @@ function writeSkillActiveState(directory, skillName, sessionId, rawSkillName) {
     : stateDir;
   const targetPath = join(targetDir, 'skill-active-state.json');
 
+  // Nesting guard: when a skill (e.g. omc-setup) invokes a child skill
+  // (e.g. mcp-setup), the child must not overwrite the parent's active state.
+  // If a DIFFERENT skill is already active in this session, skip writing —
+  // the parent's stop-hook protection already covers the session.
+  // If the SAME skill is re-invoked, allow the overwrite (idempotent refresh).
+  //
+  // NOTE: This read-check-write sequence has a TOCTOU race condition
+  // (non-atomic), but this is acceptable because Claude Code sessions are
+  // single-threaded — only one tool call executes at a time within a session.
+  try {
+    if (existsSync(targetPath)) {
+      const existing = JSON.parse(readFileSync(targetPath, 'utf-8'));
+      if (existing.active && existing.skill_name && existing.skill_name !== normalized) {
+        return; // A different skill already owns the active state — do not overwrite.
+      }
+    }
+  } catch {
+    // If read/parse fails, treat as no existing state — proceed with write
+  }
+
+  const state = {
+    active: true,
+    skill_name: normalized,
+    session_id: safeSessionId || undefined,
+    started_at: now,
+    last_checked_at: now,
+    reinforcement_count: 0,
+    max_reinforcements: config.maxReinforcements,
+    stale_ttl_ms: config.staleTtlMs,
+  };
+
   try {
     if (!existsSync(targetDir)) {
       mkdirSync(targetDir, { recursive: true });
     }
     const tmpPath = targetPath + '.tmp';
-    writeFileSync(tmpPath, JSON.stringify(state, null, 2), { mode: 0o600 });
+    const envelope = {
+      ...state,
+      _meta: { written_at: now, mode: 'skill-active', ...(safeSessionId ? { sessionId: safeSessionId } : {}) },
+    };
+    writeFileSync(tmpPath, JSON.stringify(envelope, null, 2), { mode: 0o600 });
     renameSync(tmpPath, targetPath);
   } catch {
     // Best-effort; don't fail the hook
