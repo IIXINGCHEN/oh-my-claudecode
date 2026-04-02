@@ -91,3 +91,9 @@ claude /install-plugin oh-my-claudecode
 ```
 
 **Full Changelog**: https://github.com/Yeachan-Heo/oh-my-claudecode/compare/v4.9.3...v4.10.0
+
+## Contributors
+
+Thank you to all contributors who made this release possible!
+
+@Yeachan-Heo @blue-int @2233admin @EthanJStark @lonj7798 @ZHbin0 @devswha @DdangJin @Songgyubin @riftzen-bit @sercankaya @tjsingleton
